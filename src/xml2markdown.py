@@ -32,7 +32,8 @@ def parse_memberdef(memberdef):
         elif elem.tag == "name":
             function_name = elem.text
         elif elem.tag == "briefdescription":
-            brief = elem[0].text
+            if len(elem):
+                brief = elem[0].text
 
     # start to print the members of a function
     print "## %s" % (function_name)
@@ -41,8 +42,10 @@ def parse_memberdef(memberdef):
 
     for elem in memberdef:
         if elem.tag == "detaileddescription":
-            # it only have one child <para>
-            parse_detail(elem[0])
+            if len(elem):
+                # it only have one child <para>, if the child exist, dump the
+                # detail information
+                parse_detail(elem[0])
 
     print ""
 
@@ -128,4 +131,6 @@ if __name__ == "__main__":
 
     tree = parse_xml_file(xml_file)
     func_tree = get_func_tree(tree)
-    convert_functree2markdown(func_tree)
+
+    if func_tree:
+        convert_functree2markdown(func_tree)
