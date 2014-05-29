@@ -4,22 +4,52 @@ import sys
 import getopt
 import xml.etree.cElementTree as ET
 
+# Util
+def get_subtree(tree, name):
+    for subtree in tree.iter(tag='sectiondef'):
+        if subtree.attrib['kind'] == name:
+            return subtree
+
+def get_prefix(level):
+    prefix = ""
+    for i in range(level):
+        prefix += "   "
+
+    return prefix
+
+def parse_list(list_tree, level):
+    print list_tree.text or ""
+
+    for elem in list_tree:
+        if elem.tag == "itemizedlist":
+            parse_item_list(elem, level)
+        elif elem.tag == "orderedlist":
+            parse_order_list(elem, level)
+
+def parse_order_list(order_list, level):
+    for elem in order_list:
+        if elem.tag == "listitem":
+            print "%s1. " % (get_prefix(level)),
+            parse_list(elem[0], level + 1)
+
+def parse_item_list(list_items, level):
+    for elem in list_items:
+        if elem.tag == "listitem":
+            print "%s* " % (get_prefix(level)),
+            parse_list(elem[0], level + 1)
+
+#===============================================================================
 def parse_xml_file(xml_file):
     tree = ET.parse(xml_file)
     return tree
 
-def get_func_tree(tree):
-    for elem in tree.iter(tag='sectiondef'):
-        if elem.attrib['kind'] == "func":
-            return elem
-
-def convert_functree2markdown(func_tree):
+def convert_functree2markdown(func_tree, level):
     for memberdef in func_tree:
         # parse the memberdef child, this is section including all function
         # informations
-        parse_memberdef(memberdef)
+        parse_memberdef(memberdef, level)
 
-def parse_memberdef(memberdef):
+def parse_memberdef(memberdef, level):
     function_name = ""
     function_definition = ""
     brief = ""
@@ -45,65 +75,46 @@ def parse_memberdef(memberdef):
             if len(elem):
                 # it only have one child <para>, if the child exist, dump the
                 # detail information
-                parse_detail(elem[0])
+                parse_detail(elem[0], level)
 
     print ""
 
-def parse_detail(detail_tree):
+def parse_detail(detail_tree, level):
     for elem in detail_tree:
         if elem.tag == "parameterlist" and elem.attrib['kind'] == "param":
-            parse_params(elem)
+            parse_params(elem, level)
         elif elem.tag == "simplesect" and elem.attrib['kind'] == "return":
-            parse_simplesect("return", elem)
+            parse_simplesect("return", elem, level)
         elif elem.tag == "simplesect" and elem.attrib['kind'] == "note":
-            parse_simplesect("note", elem)
+            parse_simplesect("note", elem, level)
 
-def parse_params(params_tree):
+def parse_params(params_tree, level):
     for elem in params_tree:
         if elem.tag == "parameteritem":
-            parse_param_item(elem)
+            parse_param_item(elem, level)
 
-def parse_param_item(param_item):
+def parse_param_item(param_item, level):
     for elem in param_item:
         if elem.tag == "parameternamelist":
             print "* param: `%s`" % (elem[0].text),
         elif elem.tag == "parameterdescription":
             # no child, dump the text directly
             if len(elem[0]) == 0:
-                print " %s" % (elem[0].text)
+                if elem[0].text:
+                    print " %s" % (elem[0].text)
             else:
                 # move to itemizedlist node
-                parse_list(elem[0])
+                parse_list(elem[0], level + 1)
 
-def parse_list(list_tree):
-    print list_tree.text or ""
-
-    for elem in list_tree:
-        if elem.tag == "itemizedlist":
-            parse_item_list(elem)
-        elif elem.tag == "orderedlist":
-            parse_order_list(elem)
-
-def parse_order_list(order_list):
-    for elem in order_list:
-        if elem.tag == "listitem":
-            print "   1. ",
-            parse_list(elem[0])
-
-def parse_item_list(list_items):
-    for elem in list_items:
-        if elem.tag == "listitem":
-            print "   * ",
-            parse_list(elem[0])
-
-def parse_simplesect(title, tree):
+def parse_simplesect(title, tree, level):
     print "* %s:" % (title),
 
     # move to <para> node
     if len(tree[0]) == 0:
-        print " %s" % (tree[0].text)
+        if tree[0].text:
+            print " %s" % (tree[0].text)
     else:
-        parse_list(tree[0])
+        parse_list(tree[0], level + 1)
 
 def usage():
     print "usage: xml2markdown.py -f target.xml [-h]"
@@ -130,7 +141,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     tree = parse_xml_file(xml_file)
-    func_tree = get_func_tree(tree)
+    func_tree = get_subtree(tree, "func")
 
     if func_tree:
-        convert_functree2markdown(func_tree)
+        convert_functree2markdown(func_tree, 0)
